@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KASCORE | CTF Cyber Studio</title>
+    
+    <!-- Fonts: Orbitron (Headings), Fira Code (Mono), Inter (Body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Inter:wght@400;500;600&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Social Icons (No SVG rule adherence) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                        cyber: ['Orbitron', 'sans-serif'],
+                    },
+                    colors: {
+                        cyber: {
+                            black: '#050505',
+                            dark: '#0a0f0d',
+                            panel: '#111814',
+                            border: '#1a2e23',
+                            green: '#00ff41',
+                            greenDim: '#008f11',
+                            alert: '#ff003c',
+                            cyan: '#00f0ff'
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'glitch': 'glitch 1s linear infinite',
+                        'scanline': 'scanline 8s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        glitch: {
+                            '2%, 64%': { transform: 'translate(2px,0) skew(0deg)' },
+                            '4%, 60%': { transform: 'translate(-2px,0) skew(0deg)' },
+                            '62%': { transform: 'translate(0,0) skew(5deg)' },
+                        },
+                        scanline: {
+                            '0%': { transform: 'translateY(-100%)' },
+                            '100%': { transform: 'translateY(100vh)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* Base Theme & Animations */
+        body {
+            background-color: #050505;
+            background-image: 
+                linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: #e0e0e0;
+        }
+
+        /* Cyber Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #050505; border-left: 1px solid #1a2e23; }
+        ::-webkit-scrollbar-thumb { background: #008f11; border-radius: 0px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00ff41; box-shadow: 0 0 10px #00ff41; }
+
+        /* Neon Glowing Utilities */
+        .neon-text { text-shadow: 0 0 5px rgba(0,255,65,0.5), 0 0 10px rgba(0,255,65,0.3); }
+        .neon-border { box-shadow: 0 0 10px rgba(0,255,65,0.2), inset 0 0 10px rgba(0,255,65,0.1); }
+        .neon-border:hover { box-shadow: 0 0 20px rgba(0,255,65,0.5), inset 0 0 15px rgba(0,255,65,0.2); border-color: #00ff41; }
+        
+        .neon-cyan-text { text-shadow: 0 0 5px rgba(0,240,255,0.5); }
+
+        /* Smooth Reveal Animation */
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.6s ease-out; }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+
+        /* CRT Scanline Overlay */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.3;
+        }
+
+        .chart-container { position: relative; width: 100%; height: 320px; }
+        
+        /* Hacker input styles */
+        input, select { 
+            background: #0a0f0d !important; 
+            border: 1px solid #1a2e23 !important; 
+            color: #00ff41 !important; 
+            font-family: 'Fira Code', monospace;
+        }
+        input:focus, select:focus { border-color: #00ff41 !important; box-shadow: 0 0 8px rgba(0,255,65,0.4) !important; outline: none; }
+    </style>
+</head>
+<body class="font-sans antialiased min-h-screen flex flex-col selection:bg-cyber-green selection:text-black">
+    <div class="scanlines"></div>
+
+    <!-- Header / Navigation -->
+    <header class="sticky top-0 z-40 bg-cyber-dark/90 backdrop-blur-md border-b border-cyber-green/30 shadow-[0_4px_20px_rgba(0,255,65,0.1)]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <span class="text-3xl font-cyber font-bold tracking-widest text-cyber-green animate-glitch neon-text cursor-pointer hover:text-white transition">KASCORE</span>
+                    <span class="hidden md:inline-block text-xs font-mono bg-cyber-panel text-cyber-green px-2.5 py-1 border border-cyber-border uppercase tracking-widest">Sys_Admin_View</span>
+                </div>
+                <nav class="hidden md:flex space-x-1 lg:space-x-6 text-sm font-mono font-semibold">
+                    <a href="#dashboard" class="px-3 py-2 text-gray-400 hover:text-cyber-green transition duration-300 relative group">
+                        [ Dashboard ]
+                        <span class="absolute bottom-0 left-0 w-full h-0.5 bg-cyber-green transform scale-x-0 group-hover:scale-x-100 transition duration-300"></span>
+                    </a>
+                    <a href="#explorer" class="px-3 py-2 text-gray-400 hover:text-cyber-green transition duration-300 relative group">
+                        [ Explorer ]
+                        <span class="absolute bottom-0 left-0 w-full h-0.5 bg-cyber-green transform scale-x-0 group-hover:scale-x-100 transition duration-300"></span>
+                    </a>
+                    <a href="#carousel-studio" class="px-3 py-2 text-gray-400 hover:text-cyber-green transition duration-300 relative group">
+                        [ Studio ]
+                        <span class="absolute bottom-0 left-0 w-full h-0.5 bg-cyber-green transform scale-x-0 group-hover:scale-x-100 transition duration-300"></span>
+                    </a>
+                    <a href="#threat-matrix" class="px-3 py-2 text-gray-400 hover:text-cyber-green transition duration-300 relative group">
+                        [ Matrix ]
+                        <span class="absolute bottom-0 left-0 w-full h-0.5 bg-cyber-green transform scale-x-0 group-hover:scale-x-100 transition duration-300"></span>
+                    </a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-16">
+
+        <!-- Hero Intro Section -->
+        <section class="reveal relative bg-cyber-panel text-white rounded-none border border-cyber-green/40 p-8 sm:p-12 neon-border animate-float">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyber-green to-transparent opacity-50"></div>
+            <div class="max-w-3xl space-y-6 relative z-10">
+                <div class="inline-flex items-center space-x-2 text-xs font-mono uppercase tracking-wider text-cyber-cyan bg-cyber-dark px-3 py-1 border border-cyber-cyan/50">
+                    <i class="fa-solid fa-terminal mr-2"></i> Initializing System Environment
+                </div>
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-cyber font-black tracking-tight leading-tight">
+                    Welcome to the <br/>
+                    <span class="text-cyber-green neon-text">KASCORE CTF Network</span>
+                </h1>
+                <p class="text-gray-400 font-mono text-sm sm:text-base leading-relaxed">
+                    > Accessing verified CTF frameworks (picoCTF, HTB, OverTheWire).<br>
+                    > Decrypting adversarial mechanics & vulnerability pathways.<br>
+                    > Compiling educational parameters... Done.
+                </p>
+                <div class="pt-4 flex flex-wrap gap-4 font-mono font-bold">
+                    <a href="#explorer" class="bg-cyber-green text-black hover:bg-white hover:text-black px-6 py-3 transition shadow-[0_0_15px_rgba(0,255,65,0.4)] flex items-center">
+                        <i class="fa-solid fa-magnifying-glass mr-2"></i> INITIATE_SEARCH
+                    </a>
+                    <a href="#carousel-studio" class="bg-transparent text-cyber-green border border-cyber-green hover:bg-cyber-green/10 px-6 py-3 transition flex items-center">
+                        <i class="fa-solid fa-code mr-2"></i> LAUNCH_STUDIO
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 1: DASHBOARD & ANALYTICS OVERVIEW -->
+        <section id="dashboard" class="reveal space-y-6 scroll-mt-24">
+            <div class="space-y-2 border-l-4 border-cyber-green pl-4">
+                <h2 class="text-3xl font-cyber font-bold text-white uppercase tracking-wider">System Analytics</h2>
+                <p class="text-gray-400 font-mono text-sm">Evaluating vulnerability distribution vectors and module difficulties.</p>
+            </div>
+
+            <!-- Metric Summary Cards -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-cyber-panel p-5 border border-cyber-border hover:border-cyber-cyan transition-all group">
+                    <div class="text-xs font-mono text-cyber-cyan uppercase tracking-wider mb-2">Total Modules</div>
+                    <div class="text-4xl font-cyber font-black text-white group-hover:neon-cyan-text transition" id="stat-total-count">17</div>
+                </div>
+                <div class="bg-cyber-panel p-5 border border-cyber-border hover:border-cyber-green transition-all group">
+                    <div class="text-xs font-mono text-cyber-green uppercase tracking-wider mb-2">Threat Vectors</div>
+                    <div class="text-4xl font-cyber font-black text-white group-hover:neon-text transition">7</div>
+                </div>
+                <div class="bg-cyber-panel p-5 border border-cyber-border hover:border-purple-500 transition-all group">
+                    <div class="text-xs font-mono text-purple-400 uppercase tracking-wider mb-2">Curated Assets</div>
+                    <div class="text-4xl font-cyber font-black text-white group-hover:text-purple-400 transition">15</div>
+                </div>
+                <div class="bg-cyber-panel p-5 border border-cyber-border hover:border-cyber-alert transition-all group">
+                    <div class="text-xs font-mono text-cyber-alert uppercase tracking-wider mb-2">Active Targets</div>
+                    <div class="text-4xl font-cyber font-black text-white group-hover:text-cyber-alert transition">7</div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-cyber-panel p-6 border border-cyber-border relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-2 text-xs font-mono text-gray-600">CHART_01</div>
+                    <h3 class="font-cyber font-bold text-white text-lg mb-4">Vulnerability Distribution Matrix</h3>
+                    <div class="chart-container">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-cyber-panel p-6 border border-cyber-border relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-2 text-xs font-mono text-gray-600">CHART_02</div>
+                    <h3 class="font-cyber font-bold text-white text-lg mb-4">Skill Domain Topography</h3>
+                    <div class="chart-container">
+                        <canvas id="skillRadarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: INTERACTIVE CHALLENGE EXPLORER -->
+        <section id="explorer" class="reveal space-y-6 scroll-mt-24">
+            <div class="space-y-2 border-l-4 border-cyber-green pl-4">
+                <h2 class="text-3xl font-cyber font-bold text-white uppercase tracking-wider">Payload Explorer</h2>
+                <p class="text-gray-400 font-mono text-sm">Query database for documented exploits and operational tasks.</p>
+            </div>
+
+            <!-- Search and Filter Bar -->
+            <div class="bg-cyber-panel p-4 border border-cyber-border font-mono grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="md:col-span-1">
+                    <label class="block text-xs font-bold text-cyber-green mb-1">> QUERY_STRING</label>
+                    <input type="text" id="search-input" placeholder="Enter keywords..." class="w-full px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-cyber-green mb-1">> TIER_LEVEL</label>
+                    <select id="tier-filter" class="w-full px-3 py-2 text-sm">
+                        <option value="ALL">ALL_TIERS</option>
+                        <option value="Beginner">BEGINNER</option>
+                        <option value="Intermediate">INTERMEDIATE</option>
+                        <option value="Advanced">ADVANCED</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-cyber-green mb-1">> DOMAIN</label>
+                    <select id="category-filter" class="w-full px-3 py-2 text-sm">
+                        <option value="ALL">ALL_DOMAINS</option>
+                        <option value="Web Security">WEB_SEC</option>
+                        <option value="Cryptography">CRYPTO</option>
+                        <option value="Digital Forensics">FORENSICS</option>
+                        <option value="Reverse Engineering">REV_ENG</option>
+                        <option value="OSINT">OSINT</option>
+                        <option value="Linux / System">SYS_ADMIN</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-cyber-green mb-1">> FRAMEWORK</label>
+                    <select id="platform-filter" class="w-full px-3 py-2 text-sm">
+                        <option value="ALL">ALL_PLATFORMS</option>
+                        <option value="picoCTF">picoCTF</option>
+                        <option value="OverTheWire">OverTheWire</option>
+                        <option value="Hack The Box">HackTheBox</option>
+                        <option value="ShaktiCTF">ShaktiCTF</option>
+                        <option value="TryHackMe">TryHackMe</option>
+                        <option value="Google CTF">Google_CTF</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between text-xs font-mono text-gray-500 pt-1">
+                <div>> RESULTS_FOUND: <span id="visible-count" class="font-bold text-cyber-cyan">17</span></div>
+                <button id="reset-filters-btn" class="text-cyber-alert hover:text-white transition uppercase">[ Reset_Parameters ]</button>
+            </div>
+
+            <!-- Challenge Cards Grid -->
+            <div id="challenge-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Dynamically Populated via JS -->
+            </div>
+        </section>
+
+        <!-- SECTION 3: LINKEDIN CAROUSEL STUDIO & SIMULATOR -->
+        <section id="carousel-studio" class="reveal space-y-6 scroll-mt-24">
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-l-4 border-cyber-green pl-4">
+                <div>
+                    <h2 class="text-3xl font-cyber font-bold text-white uppercase tracking-wider">Social Deployment Studio</h2>
+                    <p class="text-gray-400 font-mono text-sm mt-2">Generate formatted educational carousels for social platforms.</p>
+                </div>
+                <div class="flex items-center space-x-3 font-mono text-xs font-bold">
+                    <button id="preset-top7-btn" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 border border-purple-800 transition shadow-[0_0_10px_rgba(147,51,234,0.4)]">
+                        [ LOAD_TOP_7 ]
+                    </button>
+                    <button id="preset-all15-btn" class="bg-cyber-dark hover:bg-gray-800 text-cyber-cyan px-4 py-2 border border-cyber-cyan transition">
+                        [ LOAD_15_CURATED ]
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                <!-- Deck Controls -->
+                <div class="lg:col-span-5 bg-cyber-panel border border-cyber-border p-6 font-mono space-y-5 relative">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-cyber-green"></div>
+                    <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                        <span class="text-white font-bold tracking-wider">> SLIDE_SEQUENCE</span>
+                        <span id="slide-count-badge" class="text-cyber-green font-bold">9 MODULES</span>
+                    </div>
+
+                    <div class="space-y-2 max-h-[420px] overflow-y-auto pr-2 custom-scroll" id="slide-list-container">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-800">
+                        <button id="copy-carousel-text-btn" class="w-full bg-cyber-green hover:bg-white text-black font-bold py-3 transition flex items-center justify-center space-x-2 text-sm tracking-widest">
+                            <i class="fa-solid fa-copy"></i>
+                            <span>EXPORT_PAYLOAD_TEXT</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Preview Simulator -->
+                <div class="lg:col-span-7 bg-[#0a0f0d] p-6 sm:p-8 border border-cyber-border space-y-6 relative flex flex-col justify-between" style="background-image: radial-gradient(circle at center, #111814 0%, #050505 100%);">
+                    <div class="flex items-center justify-between text-xs font-mono border-b border-gray-800 pb-3">
+                        <span class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-cyber-alert animate-pulse"></span>
+                            <span class="text-gray-400">CAROUSEL_PREVIEW_SYS</span>
+                        </span>
+                        <span id="preview-slide-indicator" class="font-bold text-cyber-cyan">POS 1 / 9</span>
+                    </div>
+
+                    <!-- The Mobile Slide Layout -->
+                    <div class="mx-auto w-full max-w-sm aspect-[4/5] bg-white text-black p-8 shadow-2xl space-y-6 flex flex-col justify-between relative overflow-hidden transition-all duration-300 transform">
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span id="slide-preview-badge" class="text-[10px] uppercase font-extrabold tracking-widest bg-black text-white px-3 py-1">
+                                    HEADER
+                                </span>
+                                <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">KASCORE</span>
+                            </div>
+                            <h4 id="slide-preview-title" class="text-2xl font-black text-black leading-tight font-sans">
+                                Slide Title
+                            </h4>
+                        </div>
+
+                        <div class="my-auto space-y-4">
+                            <div id="slide-preview-body" class="text-[15px] text-gray-800 leading-relaxed font-medium">
+                                Body content
+                            </div>
+                            <div id="slide-preview-highlight" class="p-4 bg-gray-100 border-l-4 border-black text-sm font-bold">
+                                Highlighted text
+                            </div>
+                        </div>
+
+                        <div class="border-t-2 border-black pt-4 flex items-center justify-between text-xs font-black uppercase tracking-widest">
+                            <span>Swipe <i class="fa-solid fa-arrow-right ml-1"></i></span>
+                            <span id="slide-preview-number" class="text-black">1/9</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-center space-x-6 pt-4 font-mono font-bold text-sm">
+                        <button id="prev-slide-btn" class="text-gray-500 hover:text-white transition">
+                            <i class="fa-solid fa-chevron-left"></i> PREV
+                        </button>
+                        <button id="next-slide-btn" class="text-cyber-green hover:text-white transition">
+                            NEXT <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: THREAT MATRIX -->
+        <section id="threat-matrix" class="reveal space-y-6 scroll-mt-24">
+            <div class="space-y-2 border-l-4 border-cyber-green pl-4">
+                <h2 class="text-3xl font-cyber font-bold text-white uppercase tracking-wider">Threat Mapping Matrix</h2>
+                <p class="text-gray-400 font-mono text-sm">Cross-referencing CTF payloads with real-world enterprise vulnerabilities.</p>
+            </div>
+
+            <div class="bg-cyber-panel border border-cyber-border overflow-hidden">
+                <div class="p-4 border-b border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <span class="font-mono text-cyber-cyan font-bold text-sm">> DB_CONNECTION_ESTABLISHED</span>
+                    <input type="text" id="matrix-search-input" placeholder="Filter matrix..." class="px-3 py-1.5 text-xs w-full sm:w-64 font-mono">
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs font-mono">
+                        <thead>
+                            <tr class="bg-cyber-dark text-gray-400 uppercase tracking-wider border-b border-gray-800">
+                                <th class="p-4">Target / Payload</th>
+                                <th class="p-4">Environment</th>
+                                <th class="p-4">Vector</th>
+                                <th class="p-4">Difficulty</th>
+                                <th class="p-4 text-cyber-green">Vulnerability (CVE Class)</th>
+                                <th class="p-4">Enterprise Impact</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matrix-table-body" class="divide-y divide-gray-800 text-gray-300">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal Inspection View -->
+    <div id="challenge-modal" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cyber-panel border-2 border-cyber-green max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6 relative neon-border animate-float custom-scroll">
+            
+            <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-cyber-alert text-2xl transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="space-y-3 border-b border-gray-800 pb-4 font-mono">
+                <div class="flex flex-wrap items-center gap-3">
+                    <span id="modal-tier-badge" class="px-2 py-1 text-[10px] font-bold uppercase tracking-widest">TIER</span>
+                    <span id="modal-category-badge" class="px-2 py-1 text-[10px] font-bold bg-gray-800 text-white border border-gray-600">CATEGORY</span>
+                    <span id="modal-points-badge" class="text-xs text-cyber-cyan font-bold">PTS</span>
+                </div>
+                <h3 id="modal-title" class="text-3xl font-cyber font-black text-white">Title</h3>
+                <div class="text-[11px] text-gray-500 flex flex-wrap gap-4 pt-2 uppercase tracking-wider">
+                    <span>Target: <strong id="modal-platform" class="text-white">Platform</strong></span>
+                    <span>Archived: <strong id="modal-year" class="text-white">Year</strong></span>
+                    <span>Status: <strong id="modal-access" class="text-cyber-green">Public</strong></span>
+                </div>
+            </div>
+
+            <div class="space-y-6 text-sm text-gray-300 font-mono">
+                <div>
+                    <h4 class="font-bold text-cyber-cyan uppercase mb-2">> Payload Description</h4>
+                    <p id="modal-description" class="bg-cyber-dark p-4 border border-gray-800 leading-relaxed"></p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-cyber-green uppercase mb-2">> Execution Vector</h4>
+                    <p id="modal-accomplishment" class="bg-cyber-dark p-4 border border-gray-800 leading-relaxed"></p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-purple-400 uppercase mb-2">> Strategic Analysis</h4>
+                    <p id="modal-pedagogy" class="bg-cyber-dark p-4 border border-gray-800 leading-relaxed"></p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-amber-400 uppercase mb-2">> Export Social Pitch</h4>
+                    <div class="bg-amber-900/20 border border-amber-700/50 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <p id="modal-carousel-pitch" class="text-amber-200"></p>
+                        <button id="copy-modal-pitch-btn" class="shrink-0 bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-2 transition tracking-wider text-[10px] uppercase">
+                            <i class="fa-solid fa-clipboard mr-1"></i> Copy
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-800 pt-4 flex flex-col sm:flex-row justify-between text-xs gap-2">
+                    <span class="text-gray-500">> ORIGINAL_SOURCE_LINK:</span>
+                    <a id="modal-source-url" href="#" target="_blank" rel="noopener noreferrer" class="text-cyber-cyan hover:text-white underline truncate"></a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customized KASCORE Footer -->
+    <footer class="bg-black text-gray-500 border-t-2 border-cyber-green py-10 mt-16 font-mono relative overflow-hidden">
+        <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiMwMDAiLz48cmVjdCB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjMGYwIiBvcGFjaXR5PSIwLjA1Ii8+PC9zdmc+')] opacity-50"></div>
+        <div class="max-w-7xl mx-auto px-4 text-center space-y-6 relative z-10">
+            <h2 class="text-2xl font-cyber font-black text-white tracking-[0.2em] animate-pulse">KASCORE</h2>
+            <p class="text-xs uppercase tracking-widest text-cyber-green">CTF Educational Taxonomy & Carousel Studio</p>
+            
+            <!-- Social Links (FontAwesome based) -->
+            <div class="flex justify-center space-x-8 py-2">
+                <a href="https://linkedin.com/in/svk-vasanthkumar" target="_blank" class="text-gray-400 hover:text-[#0077b5] hover:neon-text transition transform hover:scale-125 text-2xl" title="LinkedIn Profile">
+                    <i class="fa-brands fa-linkedin"></i>
+                </a>
+                <a href="https://github.com/svk-vasanthkumar" target="_blank" class="text-gray-400 hover:text-white hover:neon-text transition transform hover:scale-125 text-2xl" title="GitHub Profile">
+                    <i class="fa-brands fa-github"></i>
+                </a>
+            </div>
+            
+            <p class="text-[11px] text-gray-600">
+                SYSTEM ARCHITECTURE BY <br/>
+                <span class="text-cyber-cyan font-bold tracking-widest text-sm mt-1 inline-block">VASANTHKUMAR S</span>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Core Logic -->
+    <script>
+        // Scroll Reveal Observer
+        const revealElements = document.querySelectorAll('.reveal');
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, { threshold: 0.1 });
+        revealElements.forEach(el => revealObserver.observe(el));
+
+        // 1. DATASET: 17 Documented CTF Challenges
+        const ctfChallenges = [
+            {
+                id: "bandit-0", name: "Bandit Level 0", platform: "OverTheWire", category: "Linux / System", tier: "Beginner", points: "N/A", year: "Evergreen", access: "Public", url: "https://overthewire.org/wargames/bandit/bandit0.html", curated: true, top7: true,
+                description: "Connect to a remote SSH server on a non-standard port utilizing provided username and password credentials.",
+                accomplishment: "Initiate an SSH session to bandit.labs.overthewire.org:2220 using bandit0:bandit0.",
+                pedagogy: "Demystifies the command-line interface and teaches essential terminal navigation.",
+                pitch: "Learn how to remotely connect to servers. You are given a username and password and must use the Secure Shell (SSH) protocol.",
+                vulnerability: "SSH Remote Access & CLI Navigation", impact: "System Access & Recon"
+            },
+            {
+                id: "insp3ct0r", name: "Insp3ct0r", platform: "picoCTF", category: "Web Security", tier: "Beginner", points: "50 pts", year: "2019/22", access: "Public", url: "https://play.picoctf.org/", curated: true, top7: true,
+                description: "Inspect client-side source code files across HTML, CSS, and JS to piece together a fragmented flag.",
+                accomplishment: "Open browser developer tools, inspect raw page code, and assemble the flag.",
+                pedagogy: "Demonstrates that client-side frontend code is completely exposed to end-users.",
+                pitch: "Discover hidden secrets in plain sight by using 'Inspect Element' in your browser.",
+                vulnerability: "Client-Side Information Disclosure", impact: "Exposed Hardcoded Credentials"
+            },
+            {
+                id: "information", name: "Information", platform: "picoCTF", category: "Digital Forensics", tier: "Beginner", points: "10 pts", year: "2021", access: "Public", url: "https://play.picoctf.org/", curated: true, top7: true,
+                description: "Extract hidden EXIF metadata embedded within a standard JPEG image file and decode a Base64 string.",
+                accomplishment: "Use metadata extraction tools to discover a Base64 string and decode it.",
+                pedagogy: "Highlights data exhaust and hidden metadata attached to digital artifacts.",
+                pitch: "Understand digital breadcrumbs left in photos by extracting invisible metadata.",
+                vulnerability: "EXIF Metadata Exhaust", impact: "Operational Security Leakage"
+            },
+            {
+                id: "mod-26", name: "Mod 26", platform: "picoCTF", category: "Cryptography", tier: "Beginner", points: "10 pts", year: "2021", access: "Public", url: "https://play.picoctf.org/", curated: true, top7: true,
+                description: "Decode a ciphertext string obfuscated using the classical ROT13 substitution cipher.",
+                accomplishment: "Apply a ROT13 rotation algorithm using CyberChef or Python.",
+                pedagogy: "Provides an easy entry point into cryptography.",
+                pitch: "Learn the difference between encoding and encryption by decoding a ROT13 shifted message.",
+                vulnerability: "Weak Substitution Cipher", impact: "Data Obfuscation Defeated"
+            },
+            {
+                id: "static-noise", name: "Static ain't always noise", platform: "picoCTF", category: "Miscellaneous", tier: "Beginner", points: "20 pts", year: "2021", access: "Public", url: "https://play.picoctf.org/", curated: true, top7: false,
+                description: "Extract printable ASCII text strings from a compiled 64-bit ELF binary executable file.",
+                accomplishment: "Execute the command 'strings static' to parse raw binary data.",
+                pedagogy: "Acts as a bridge into binary static analysis.",
+                pitch: "Peek inside compiled software using simple terminal tools to extract hidden passwords.",
+                vulnerability: "Hardcoded Credentials in Executables", impact: "Static Analysis Disclosure"
+            },
+            {
+                id: "binary-search", name: "Binary Search", platform: "picoCTF", category: "Linux / System", tier: "Beginner", points: "100 pts", year: "2024", access: "Public", url: "https://play.picoctf.org/", curated: true, top7: false,
+                description: "Guess a target random number between 1 and 1000 within 10 attempts using binary search.",
+                accomplishment: "Systematically halve the search space based on server feedback.",
+                pedagogy: "Merges core computer science algorithmic thinking with shell usage.",
+                pitch: "Apply mathematical 'binary search' algorithms to guess a hidden value efficiently.",
+                vulnerability: "Algorithmic Search Efficiency", impact: "Optimizing Recon Operations"
+            },
+            {
+                id: "my-git", name: "MY GIT", platform: "picoCTF", category: "Linux / System", tier: "Intermediate", points: "Var", year: "2026", access: "Public", url: "https://play.picoctf.org/", curated: true, top7: true,
+                description: "Bypass Git remote identity verification by modifying local user configuration settings.",
+                accomplishment: "Configure local Git settings to match expected repository identity checks.",
+                pedagogy: "Exposes a pervasive flaw in DevSecOps regarding commit metadata spoofing.",
+                pitch: "Trick a Git server into accepting your code by spoofing your local username.",
+                vulnerability: "Unsigned VCS Identity Spoofing", impact: "Supply Chain Bypasses"
+            },
+            {
+                id: "n0s4n1ty-1", name: "n0s4n1ty 1", platform: "picoCTF", category: "Web Security", tier: "Intermediate", points: "Var", year: "2026", access: "Public", url: "https://play.picoctf.org/", curated: true, top7: true,
+                description: "Exploit an unvalidated profile picture file upload to upload a PHP web shell.",
+                accomplishment: "Upload shell.php and navigate directly to execute OS commands.",
+                pedagogy: "Highlights the extreme risks of mishandled file extensions.",
+                pitch: "Turn a profile picture upload into a weapon by uploading a malicious script.",
+                vulnerability: "Unrestricted File Upload to RCE", impact: "Server Takeover"
+            },
+            {
+                id: "tftp-forensics", name: "TFTP Forensics", platform: "picoCTF", category: "Digital Forensics", tier: "Intermediate", points: "90 pts", year: "2021", access: "Public", url: "https://play.picoctf.org/", curated: true, top7: false,
+                description: "Analyze a PCAP network packet capture file to extract unencrypted TFTP traffic files.",
+                accomplishment: "Filter TFTP streams in Wireshark and extract payload packages.",
+                pedagogy: "Teaches network packet analysis and the dangers of unencrypted protocols.",
+                pitch: "Spy on network traffic like a digital detective using Wireshark.",
+                vulnerability: "Unencrypted Protocol Transmission", impact: "Passive Eavesdropping"
+            },
+            {
+                id: "vault-door-1", name: "vault-door-1", platform: "picoCTF", category: "Reverse Engineering", tier: "Intermediate", points: "100 pts", year: "2019", access: "Public", url: "https://play.picoctf.org/", curated: true, top7: false,
+                description: "Reverse engineer a Java authentication vault class.",
+                accomplishment: "Analyze Java source code and map out randomized character checks.",
+                pedagogy: "Introduces static reverse engineering proving client-side auth is broken.",
+                pitch: "Reverse engineer a password checker by reading the raw application code.",
+                vulnerability: "Hardcoded Client-Side Logic", impact: "Auth Bypass via Static Analysis"
+            },
+            {
+                id: "find-me", name: "Find Me", platform: "ShaktiCTF", category: "Digital Forensics", tier: "Intermediate", points: "Var", year: "2021", access: "Archive", url: "https://github.com/TeamShakti/CTF-Writeups", curated: true, top7: true,
+                description: "Perform multi-stage network packet forensic extraction.",
+                accomplishment: "Locate strings in PCAP, decode ZIP password, extract and reverse text.",
+                pedagogy: "Emulates real incident response investigations chaining multiple tools.",
+                pitch: "Analyze network data to find a hidden password and crack open secret files.",
+                vulnerability: "Cleartext Exfiltration", impact: "Multi-Stage Forensics"
+            },
+            {
+                id: "cache-me-outside", name: "Cache Me Outside", platform: "TryHackMe", category: "OSINT", tier: "Intermediate", points: "Var", year: "Evergreen", access: "Public", url: "https://tryhackme.com/", curated: true, top7: false,
+                description: "Gather OSINT across fitness apps, GitHub, and social footprints.",
+                accomplishment: "Aggregate public footprint data to trace the target profile.",
+                pedagogy: "Demonstrates that cyber reconnaissance involves mapping human behavior.",
+                pitch: "Track down a target using Open Source Intelligence across the public web.",
+                vulnerability: "Public OPSEC Leaks", impact: "Target Reconnaissance"
+            },
+            {
+                id: "pasteurize", name: "Pasteurize", platform: "Google CTF", category: "Web Security", tier: "Advanced", points: "Var", year: "2020", access: "Archive", url: "https://github.com/google/google-ctf", curated: true, top7: false,
+                description: "Bypass DOMPurify XSS sanitization in a NodeJS app.",
+                accomplishment: "Submit an array object to force JSON.stringify to inject unescaped quotes.",
+                pedagogy: "Demonstrates advanced JavaScript backend type confusion.",
+                pitch: "Trick a secure note-taking app by changing how data is formatted to bypass filters.",
+                vulnerability: "NodeJS Type Confusion", impact: "Session Hijacking (XSS)"
+            },
+            {
+                id: "locktalk", name: "LockTalk", platform: "Hack The Box", category: "Web Security", tier: "Advanced", points: "Var", year: "2024", access: "Archive", url: "https://www.hackthebox.com/", curated: true, top7: false,
+                description: "Chain HAProxy HTTP request smuggling with outdated python-jwt forging.",
+                accomplishment: "Bypass proxy route restrictions to forge an administrator JWT token.",
+                pedagogy: "Provides real-world enterprise infrastructure attack chaining.",
+                pitch: "Chain vulnerabilities to sneak past load balancers and forge fake admin tokens.",
+                vulnerability: "HTTP Smuggling & JWT Forgery", impact: "Full Privilege Escalation"
+            },
+            {
+                id: "liar-web", name: "Liar", platform: "InCTF", category: "Web Security", tier: "Advanced", points: "Var", year: "Archive", access: "Archive", url: "https://inctf.in/", curated: true, top7: false,
+                description: "Extract hidden Mercurial directories to uncover scripts and perform SQLi.",
+                accomplishment: "Download .hg/dirstate, locate vulnerable.php, and dump DB.",
+                pedagogy: "Highlights exposed version control repositories in production.",
+                pitch: "Discover hidden version control directories to silently extract databases.",
+                vulnerability: "Exposed VCS & Blind SQLi", impact: "Source Code & DB Exfiltration"
+            },
+            {
+                id: "labyrinth-linguist", name: "Labyrinth Linguist", platform: "Hack The Box", category: "Web Security", tier: "Advanced", points: "Var", year: "2024", access: "Archive", url: "https://www.hackthebox.com/", curated: false, top7: false,
+                description: "Exploit Apache Velocity template engine to achieve SSTI.",
+                accomplishment: "Inject custom Velocity syntax to execute underlying OS commands.",
+                pedagogy: "Demonstrates data-flow analysis in Java web frameworks.",
+                pitch: "Weaponize enterprise template engines to force arbitrary command execution.",
+                vulnerability: "Server-Side Template Injection", impact: "Remote Code Execution"
+            },
+            {
+                id: "bomb-re", name: "bomb", platform: "ShaktiCTF", category: "Reverse Engineering", tier: "Advanced", points: "200 pts", year: "2021", access: "Archive", url: "https://github.com/TeamShakti/CTF-Writeups", curated: false, top7: false,
+                description: "Reverse engineer a C++ crackme binary with XOR obfuscation.",
+                accomplishment: "Decompile binary in Ghidra and write a Python solver script.",
+                pedagogy: "Teaches algorithmic disassembly and automated exploit construction.",
+                pitch: "Defeat obfuscated binary protections using Ghidra and custom Python automation.",
+                vulnerability: "Custom Obfuscation", impact: "Payload Recovery"
+            }
+        ];
+
+        // 2. STATE MANAGEMENT
+        let currentTier = "ALL";
+        let currentCategory = "ALL";
+        let currentPlatform = "ALL";
+        let searchQuery = "";
+        let currentSlideIndex = 0;
+        let carouselSlides = [];
+
+        // 3. INITIALIZATION
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            renderExplorerGrid();
+            initCarouselDeck('top7');
+            renderMatrixTable();
+            setupEventListeners();
+        });
+
+        // Chart.js Visualization Logic (Dark Theme Updates)
+        function initCharts() {
+            Chart.defaults.color = '#9ca3af';
+            Chart.defaults.font.family = "'Fira Code', monospace";
+
+            // Category Bar Chart
+            const catCanvas = document.getElementById('categoryChart').getContext('2d');
+            const categories = ["Web Security", "Cryptography", "Digital Forensics", "Reverse Engineering", "OSINT", "Linux / System", "Miscellaneous"];
+            const beginnerData = categories.map(cat => ctfChallenges.filter(c => c.category === cat && c.tier === 'Beginner').length);
+            const interData = categories.map(cat => ctfChallenges.filter(c => c.category === cat && c.tier === 'Intermediate').length);
+            const advData = categories.map(cat => ctfChallenges.filter(c => c.category === cat && c.tier === 'Advanced').length);
+
+            new Chart(catCanvas, {
+                type: 'bar',
+                data: {
+                    labels: ["Web", "Crypto", "Forensics", "RE", "OSINT", "Linux", "Misc"],
+                    datasets: [
+                        { label: 'Beginner', data: beginnerData, backgroundColor: '#00ff41', borderColor: '#008f11', borderWidth: 1 },
+                        { label: 'Intermediate', data: interData, backgroundColor: '#00f0ff', borderColor: '#00a3cc', borderWidth: 1 },
+                        { label: 'Advanced', data: advData, backgroundColor: '#ff003c', borderColor: '#b3002a', borderWidth: 1 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, grid: { color: '#1a2e23' } },
+                        y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#1a2e23' } }
+                    },
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Radar Chart
+            const radarCanvas = document.getElementById('skillRadarChart').getContext('2d');
+            new Chart(radarCanvas, {
+                type: 'radar',
+                data: {
+                    labels: ['Web', 'Crypto', 'Forensics', 'Rev.Eng', 'OSINT', 'Linux'],
+                    datasets: [{
+                        label: 'Threat Weight',
+                        data: [6, 2, 3, 2, 1, 3],
+                        backgroundColor: 'rgba(0, 255, 65, 0.2)',
+                        borderColor: '#00ff41',
+                        pointBackgroundColor: '#00f0ff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        r: { 
+                            angleLines: { color: '#1a2e23' },
+                            grid: { color: '#1a2e23' },
+                            pointLabels: { color: '#00ff41' },
+                            ticks: { display: false, stepSize: 2 }
+                        }
+                    },
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        // EXPLORER GRID RENDERER
+        function renderExplorerGrid() {
+            const gridContainer = document.getElementById('challenge-grid');
+            gridContainer.innerHTML = '';
+
+            const filtered = ctfChallenges.filter(c => {
+                const matchTier = (currentTier === "ALL" || c.tier === currentTier);
+                const matchCategory = (currentCategory === "ALL" || c.category === currentCategory);
+                const matchPlatform = (currentPlatform === "ALL" || c.platform === currentPlatform);
+                const matchSearch = searchQuery === "" || 
+                    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    c.vulnerability.toLowerCase().includes(searchQuery.toLowerCase());
+                return matchTier && matchCategory && matchPlatform && matchSearch;
+            });
+
+            document.getElementById('visible-count').innerText = filtered.length;
+
+            if (filtered.length === 0) {
+                gridContainer.innerHTML = `
+                    <div class="col-span-full py-12 text-center border border-dashed border-cyber-alert bg-cyber-dark text-cyber-alert font-mono">
+                        <i class="fa-solid fa-triangle-exclamation text-3xl mb-2"></i>
+                        <div class="font-bold">NULL_RESULTS</div>
+                        <div class="text-xs mt-1">Adjust query parameters.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const badgeColor = item.tier === 'Beginner' ? 'bg-cyber-green text-black' :
+                                   item.tier === 'Intermediate' ? 'bg-cyber-cyan text-black' : 'bg-cyber-alert text-white';
+                
+                const cardHtml = `
+                    <div class="bg-cyber-panel border border-cyber-border hover:border-cyber-green transition-all shadow-sm hover:shadow-[0_0_15px_rgba(0,255,65,0.2)] p-5 flex flex-col justify-between space-y-4 group">
+                        <div class="space-y-3 font-mono">
+                            <div class="flex items-center justify-between">
+                                <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${badgeColor}">${item.tier}</span>
+                                <span class="text-[10px] text-gray-500 font-bold tracking-widest uppercase">${item.platform}</span>
+                            </div>
+                            <h3 class="font-cyber font-bold text-white text-xl uppercase tracking-wider group-hover:text-cyber-green transition-colors">${item.name}</h3>
+                            <div class="text-[10px] font-bold text-cyber-cyan border border-cyber-cyan/30 px-2 py-1 inline-block uppercase">
+                                [ ${item.category} ]
+                            </div>
+                            <p class="text-xs text-gray-400 leading-relaxed h-14 overflow-hidden">
+                                > ${item.pitch}
+                            </p>
+                        </div>
+                        <div class="border-t border-gray-800 pt-3 flex items-center justify-between font-mono">
+                            <span class="text-[10px] text-gray-600">${item.points}</span>
+                            <button onclick="openChallengeModal('${item.id}')" class="text-[10px] font-bold bg-transparent border border-gray-600 text-gray-300 hover:text-black hover:bg-cyber-green hover:border-cyber-green px-3 py-1.5 transition uppercase tracking-widest flex items-center">
+                                Inspect_Data <i class="fa-solid fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                gridContainer.insertAdjacentHTML('beforeend', cardHtml);
+            });
+        }
+
+        // MODAL LOGIC
+        function openChallengeModal(id) {
+            const item = ctfChallenges.find(c => c.id === id);
+            if (!item) return;
+
+            document.getElementById('modal-title').innerText = item.name;
+            document.getElementById('modal-platform').innerText = item.platform;
+            document.getElementById('modal-year').innerText = item.year;
+            document.getElementById('modal-access').innerText = item.access;
+            document.getElementById('modal-points-badge').innerText = item.points;
+            
+            const tierBadge = document.getElementById('modal-tier-badge');
+            tierBadge.innerText = item.tier;
+            tierBadge.className = `px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${
+                item.tier === 'Beginner' ? 'bg-cyber-green text-black' :
+                item.tier === 'Intermediate' ? 'bg-cyber-cyan text-black' : 'bg-cyber-alert text-white'
+            }`;
+
+            document.getElementById('modal-category-badge').innerText = item.category;
+            document.getElementById('modal-description').innerText = item.description;
+            document.getElementById('modal-accomplishment').innerText = item.accomplishment;
+            document.getElementById('modal-pedagogy').innerText = item.pedagogy;
+            document.getElementById('modal-carousel-pitch').innerText = item.pitch;
+
+            const linkElem = document.getElementById('modal-source-url');
+            linkElem.href = item.url;
+            linkElem.innerText = item.url;
+
+            document.getElementById('copy-modal-pitch-btn').onclick = () => {
+                navigator.clipboard.writeText(`${item.name} (${item.category}): ${item.pitch}`);
+                alert("Payload copied to clipboard.");
+            };
+
+            document.getElementById('challenge-modal').classList.remove('hidden');
+        }
+
+        // CAROUSEL SIMULATOR
+        function initCarouselDeck(type = 'top7') {
+            carouselSlides = [];
+            carouselSlides.push({
+                type: 'HOOK', badge: 'INIT_SEQUENCE',
+                title: 'Master Cybersecurity with 7 Real CTF Challenges',
+                body: 'Traditional theory often fails to build true adversarial logic. CTFs bridge the gap with hands-on scenarios.',
+                highlight: 'Swipe to explore 7 curated, real-world CTF exercises!'
+            });
+
+            let selectedItems = (type === 'top7') ? ctfChallenges.filter(c => c.top7) : ctfChallenges.filter(c => c.curated);
+
+            selectedItems.forEach((item, index) => {
+                carouselSlides.push({
+                    type: 'CHALLENGE', badge: `${item.tier} // ${item.category}`,
+                    title: `${index + 1}. ${item.name}`, body: item.pitch,
+                    highlight: `Vulnerability: ${item.vulnerability}`
+                });
+            });
+
+            carouselSlides.push({
+                type: 'CTA', badge: 'END_OF_FILE',
+                title: 'Initiate Your Training',
+                body: 'Ready to build practical security skills? Platforms like picoCTF are 100% free.',
+                highlight: 'Follow for weekly breakdowns and technical payloads. [KASCORE]'
+            });
+
+            currentSlideIndex = 0;
+            renderSlideListUI();
+            updateSlidePreviewUI();
+        }
+
+        function renderSlideListUI() {
+            const container = document.getElementById('slide-list-container');
+            container.innerHTML = '';
+            document.getElementById('slide-count-badge').innerText = `${carouselSlides.length} MODULES`;
+
+            carouselSlides.forEach((slide, idx) => {
+                const isActive = idx === currentSlideIndex;
+                const borderClass = isActive ? 'border-cyber-green bg-cyber-green/10' : 'border-gray-800 hover:border-gray-600 bg-cyber-dark';
+                const textClass = isActive ? 'text-cyber-green' : 'text-gray-500';
+
+                const slideHtml = `
+                    <div onclick="selectSlide(${idx})" class="p-3 border transition cursor-pointer flex items-center justify-between ${borderClass}">
+                        <div class="truncate pr-2">
+                            <div class="font-bold text-white text-sm truncate">${idx + 1}. ${slide.title}</div>
+                            <div class="text-[10px] text-gray-500 uppercase tracking-widest mt-1">${slide.badge}</div>
+                        </div>
+                        <span class="text-[10px] font-bold ${textClass}">
+                            ${isActive ? '[ACTIVE]' : '[LOAD]'}
+                        </span>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', slideHtml);
+            });
+        }
+
+        function selectSlide(index) {
+            currentSlideIndex = index;
+            renderSlideListUI();
+            updateSlidePreviewUI();
+        }
+
+        function updateSlidePreviewUI() {
+            const slide = carouselSlides[currentSlideIndex];
+            if (!slide) return;
+            document.getElementById('slide-preview-badge').innerText = slide.badge;
+            document.getElementById('slide-preview-title').innerText = slide.title;
+            document.getElementById('slide-preview-body').innerText = slide.body;
+            document.getElementById('slide-preview-highlight').innerText = slide.highlight;
+            document.getElementById('slide-preview-number').innerText = `${currentSlideIndex + 1}/${carouselSlides.length}`;
+            document.getElementById('preview-slide-indicator').innerText = `POS ${currentSlideIndex + 1} / ${carouselSlides.length}`;
+        }
+
+        // MATRIX TABLE RENDERER
+        function renderMatrixTable(query = '') {
+            const tbody = document.getElementById('matrix-table-body');
+            tbody.innerHTML = '';
+            const filtered = ctfChallenges.filter(c => {
+                if (!query) return true;
+                const q = query.toLowerCase();
+                return c.name.toLowerCase().includes(q) || c.vulnerability.toLowerCase().includes(q) || c.impact.toLowerCase().includes(q);
+            });
+
+            filtered.forEach(c => {
+                const row = `
+                    <tr class="hover:bg-gray-800/50 transition">
+                        <td class="p-4 font-bold text-white">${c.name}</td>
+                        <td class="p-4 text-gray-400 text-xs">${c.platform}</td>
+                        <td class="p-4 text-cyber-cyan text-xs">${c.category}</td>
+                        <td class="p-4 text-xs">${c.tier}</td>
+                        <td class="p-4 text-cyber-green font-bold text-xs">> ${c.vulnerability}</td>
+                        <td class="p-4 text-gray-400 text-xs">${c.impact}</td>
+                    </tr>
+                `;
+                tbody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+
+        // EVENT LISTENERS
+        function setupEventListeners() {
+            ['tier-filter', 'category-filter', 'platform-filter'].forEach(id => {
+                document.getElementById(id).addEventListener('change', (e) => {
+                    if (id==='tier-filter') currentTier = e.target.value;
+                    if (id==='category-filter') currentCategory = e.target.value;
+                    if (id==='platform-filter') currentPlatform = e.target.value;
+                    renderExplorerGrid();
+                });
+            });
+
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                searchQuery = e.target.value;
+                renderExplorerGrid();
+            });
+
+            document.getElementById('reset-filters-btn').addEventListener('click', () => {
+                currentTier = "ALL"; currentCategory = "ALL"; currentPlatform = "ALL"; searchQuery = "";
+                document.getElementById('tier-filter').value = "ALL";
+                document.getElementById('category-filter').value = "ALL";
+                document.getElementById('platform-filter').value = "ALL";
+                document.getElementById('search-input').value = "";
+                renderExplorerGrid();
+            });
+
+            document.getElementById('close-modal-btn').addEventListener('click', () => {
+                document.getElementById('challenge-modal').classList.add('hidden');
+            });
+
+            document.getElementById('prev-slide-btn').addEventListener('click', () => {
+                if (currentSlideIndex > 0) { currentSlideIndex--; renderSlideListUI(); updateSlidePreviewUI(); }
+            });
+
+            document.getElementById('next-slide-btn').addEventListener('click', () => {
+                if (currentSlideIndex < carouselSlides.length - 1) { currentSlideIndex++; renderSlideListUI(); updateSlidePreviewUI(); }
+            });
+
+            document.getElementById('preset-top7-btn').addEventListener('click', () => initCarouselDeck('top7'));
+            document.getElementById('preset-all15-btn').addEventListener('click', () => initCarouselDeck('curated'));
+
+            document.getElementById('copy-carousel-text-btn').addEventListener('click', () => {
+                let fullText = "⚡ KASCORE CTF CAROUSEL PAYLOAD ⚡\n\n";
+                carouselSlides.forEach((s, idx) => {
+                    fullText += `[ SLIDE ${idx + 1}: ${s.title} ]\n${s.body}\n> ${s.highlight}\n\n`;
+                });
+                navigator.clipboard.writeText(fullText);
+                alert("System Alert: Full payload copied to clipboard.");
+            });
+
+            document.getElementById('matrix-search-input').addEventListener('input', (e) => {
+                renderMatrixTable(e.target.value);
+            });
+        }
+    </script>
+</body>
+</html>
